@@ -384,12 +384,18 @@ export function renderAnalyticsView(container) {
     const gridLineColor = isDark ? '#44474f' : '#e1e2ec';
     const chartAreaColor = isDark ? '#1e1f20' : '#f0f4f9';
 
+    const isMobile = window.innerWidth < 768;
+
     // Opciones estéticas Material Design
     const commonOptions = {
       backgroundColor: 'transparent',
-      legend: { textStyle: { color: textColor, fontName: 'Outfit' } },
+      legend: isMobile 
+        ? { position: 'bottom', textStyle: { color: textColor, fontName: 'Outfit', fontSize: 10 } }
+        : { textStyle: { color: textColor, fontName: 'Outfit' } },
       titleTextStyle: { color: textColor, fontName: 'Outfit', fontSize: 14, bold: true },
-      chartArea: { width: '85%', height: '70%' },
+      chartArea: isMobile 
+        ? { width: '90%', height: '65%', top: 30 }
+        : { width: '85%', height: '70%' },
       animation: { startup: true, duration: 600, easing: 'out' }
     };
 
@@ -451,7 +457,9 @@ export function renderAnalyticsView(container) {
         viewWindow: { min: 0 }
       },
       colors: ['#1a73e8'], // Azul Google
-      chartArea: { width: '90%', height: '75%' }
+      chartArea: window.innerWidth < 768 
+        ? { width: '90%', height: '65%', top: 20 }
+        : { width: '90%', height: '75%' }
     };
 
     const chart = new google.visualization.AreaChart(document.getElementById('chart-trend'));
@@ -479,7 +487,9 @@ export function renderAnalyticsView(container) {
       datalessRegionColor: isDark ? '#2a2b2d' : '#f0f4f9', // Color de países sin clics
       colorAxis: { colors: ['#c2e7ff', '#1a73e8'] }, // Gradiente azul Google
       keepAspectRatio: true,
-      legend: { textStyle: { color: options.legend.textStyle.color } }
+      legend: window.innerWidth < 768 
+        ? { position: 'bottom', textStyle: { color: options.legend.textStyle.color, fontSize: 10 } }
+        : { textStyle: { color: options.legend.textStyle.color } }
     };
 
     const chart = new google.visualization.GeoChart(document.getElementById('chart-map'));
@@ -508,7 +518,9 @@ export function renderAnalyticsView(container) {
       },
       vAxis: { textStyle: { color: textColor, fontName: 'Outfit', fontSize: 11 } },
       colors: ['#34a853'], // Verde Google
-      chartArea: { width: '80%', height: '80%' }
+      chartArea: window.innerWidth < 768 
+        ? { width: '85%', height: '70%', left: 50 }
+        : { width: '80%', height: '80%' }
     };
 
     const chart = new google.visualization.BarChart(document.getElementById('chart-links'));
@@ -531,7 +543,9 @@ export function renderAnalyticsView(container) {
     const pieOptions = {
       ...options,
       pieHole: 0.45, // Transforma el pastel en una rosca (donut chart) muy moderna
-      chartArea: { width: '90%', height: '80%' },
+      chartArea: window.innerWidth < 768 
+        ? { width: '95%', height: '75%', top: 20 }
+        : { width: '90%', height: '80%' },
       colors: ['#1a73e8', '#ea4335', '#34a853', '#fbbc05', '#a8c7fa', '#7fcfff'] // Paleta de colores Google
     };
 
