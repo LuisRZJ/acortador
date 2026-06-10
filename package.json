@@ -1,0 +1,12 @@
+{
+  "name": "goo-short",
+  "version": "1.0.0",
+  "description": "Acortador de enlaces SPA personal al estilo Google",
+  "main": "index.html",
+  "scripts": {
+    "dev": "serve -s ."
+  },
+  "devDependencies": {
+    "serve": "^14.2.3"
+  }
+}
