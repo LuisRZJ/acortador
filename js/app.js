@@ -148,7 +148,7 @@ async function router() {
           } catch (e) {
             console.warn('Error al transmitir en tiempo real:', e);
           }
-        }        }
+        }
 
         const controlArea = appView.querySelector('#redirect-control-area');
         
