@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Degradado de fondo premium -->
+    <linearGradient id="bg-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0b57d0" />
+      <stop offset="100%" stop-color="#00a3ff" />
+    </linearGradient>
+    <!-- Sombra para el icono central -->
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#001d55" flood-opacity="0.3" />
+    </filter>
+  </defs>
+  <!-- Fondo redondeado suave adaptable a maskable -->
+  <rect x="0" y="0" width="512" height="512" rx="112" fill="url(#bg-grad)" />
+  
+  <!-- Icono de eslabón de cadena central (estilo Material Link) -->
+  <g filter="url(#shadow)" transform="translate(116, 116) scale(11.66)">
+    <!-- Path de material icon 'link' escalado -->
+    <path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z" fill="#ffffff" />
+  </g>
+</svg>

@@ -285,15 +285,25 @@ async function router() {
   }
 }
 
+function closeMobileDrawer() {
+  const navRail = document.getElementById('navigation-rail');
+  const overlay = document.getElementById('drawer-overlay');
+  if (navRail && overlay) {
+    navRail.classList.remove('open');
+    overlay.classList.remove('active');
+  }
+}
+
 // Función para navegar sin recargar la página
 function navigateTo(path) {
+  closeMobileDrawer();
   window.history.pushState(null, '', path);
   router();
 }
 
-// Actualiza los estados de active en los botones de navegación (Rail y Bottom Bar)
+// Actualiza los estados de active en los botones de navegación (Rail)
 function updateNavUI(path) {
-  const navItems = document.querySelectorAll('.nav-item, .bottom-nav-item');
+  const navItems = document.querySelectorAll('.nav-item');
   
   navItems.forEach(item => {
     const itemPath = item.getAttribute('data-path');
@@ -310,7 +320,7 @@ function updateNavUI(path) {
 
 // Interceptar clics en los enlaces de navegación locales
 function setupNavigationListeners() {
-  const navItems = document.querySelectorAll('.nav-item, .bottom-nav-item');
+  const navItems = document.querySelectorAll('.nav-item');
   
   navItems.forEach(item => {
     item.addEventListener('click', (e) => {
@@ -460,6 +470,26 @@ async function getIPAndLocation() {
   }
 }
 
+function setupMobileDrawerListeners() {
+  const menuToggle = document.getElementById('menu-toggle');
+  const navRail = document.getElementById('navigation-rail');
+  const overlay = document.getElementById('drawer-overlay');
+
+  if (menuToggle && navRail && overlay) {
+    // Abrir menú
+    menuToggle.addEventListener('click', () => {
+      navRail.classList.add('open');
+      overlay.classList.add('active');
+    });
+
+    // Cerrar menú al presionar overlay
+    overlay.addEventListener('click', () => {
+      navRail.classList.remove('open');
+      overlay.classList.remove('active');
+    });
+  }
+}
+
 // Inicialización de la Aplicación
 async function init() {
   initTheme();
@@ -473,9 +503,13 @@ async function init() {
   }
 
   setupNavigationListeners();
+  setupMobileDrawerListeners();
   
   // Escuchar cuando el usuario navega hacia atrás/adelante en el historial
   window.addEventListener('popstate', router);
+
+  // Registrar el Service Worker de la PWA
+  registerServiceWorker();
 
   // Ejecutar el enrutador para cargar la página actual
   router();
@@ -483,6 +517,49 @@ async function init() {
 
 // Arrancar la app al cargar el DOM
 document.addEventListener('DOMContentLoaded', init);
+
+// Registra el Service Worker y maneja notificaciones de actualización
+function registerServiceWorker() {
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js').then((registration) => {
+        console.log('Service Worker registrado con éxito en el scope:', registration.scope);
+        
+        // Comprobar si hay actualizaciones de la app
+        registration.addEventListener('updatefound', () => {
+          const installingWorker = registration.installing;
+          if (installingWorker == null) return;
+          
+          installingWorker.addEventListener('statechange', () => {
+            if (installingWorker.state === 'installed') {
+              if (navigator.serviceWorker.controller) {
+                // Hay contenido nuevo disponible, notificar al usuario
+                showUpdateNotification();
+              } else {
+                console.log('El contenido se ha precacheado para usarse offline.');
+              }
+            }
+          });
+        });
+      }).catch((err) => {
+        console.error('Error al registrar el Service Worker:', err);
+      });
+    });
+  }
+}
+
+// Muestra una notificación flotante cuando hay una versión nueva lista
+function showUpdateNotification() {
+  import('./components/settingsView.js').then(({ showStatusToast }) => {
+    showStatusToast('Nueva versión de la app disponible. Actualizando...', 'success');
+    setTimeout(() => {
+      window.location.reload();
+    }, 2000);
+  }).catch(() => {
+    console.log('Nueva versión de la app disponible. Actualizando...');
+    window.location.reload();
+  });
+}
 
 // Inicializa y gestiona la lógica táctil/ratón del deslizador Swipe para confirmar
 function initSwipeRedirect(track, handle, text, destinationUrl) {

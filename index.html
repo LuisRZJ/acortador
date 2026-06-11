@@ -8,6 +8,15 @@
   <!-- SEO Meta Tags -->
   <meta name="description" content="Acortador de enlaces premium con diseño Material Design 3 e IndexedDB local. Crea, gestiona y analiza tus enlaces.">
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%231a73e8%22><path d=%22M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z%22/></svg>">
+  
+  <!-- PWA Settings -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#f8f9fa" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0f0f0f" media="(prefers-color-scheme: dark)">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Goo.short">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="apple-touch-icon" href="icon.svg">
 
   <!-- Google Fonts - Outfit & Roboto -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -30,6 +39,9 @@
     <!-- Top App Bar -->
     <header class="top-app-bar">
       <div class="brand">
+        <button id="menu-toggle" class="icon-btn mobile-only" aria-label="Abrir menú de navegación" style="margin-right: 8px;">
+          <span class="material-symbols-outlined">menu</span>
+        </button>
         <span class="material-symbols-outlined logo-icon">link</span>
         <h1 class="logo-text">Acortador de enlaces</h1>
       </div>
@@ -78,29 +90,8 @@
       
     </div>
 
-    <!-- Bottom Navigation Bar (Móvil) -->
-    <nav class="bottom-navigation">
-      <button class="bottom-nav-item active" data-path="/" id="bottom-btn-generate">
-        <span class="material-symbols-outlined">add_link</span>
-        <span class="bottom-nav-label">Crear</span>
-      </button>
-      <button class="bottom-nav-item" data-path="/gestion" id="bottom-btn-manage">
-        <span class="material-symbols-outlined">analytics</span>
-        <span class="bottom-nav-label">Gestionar</span>
-      </button>
-      <button class="bottom-nav-item" data-path="/analiticas" id="bottom-btn-analytics">
-        <span class="material-symbols-outlined">monitoring</span>
-        <span class="bottom-nav-label">Analíticas</span>
-      </button>
-      <button class="bottom-nav-item" data-path="/campanas" id="bottom-btn-campaigns">
-        <span class="material-symbols-outlined">campaign</span>
-        <span class="bottom-nav-label">Campañas</span>
-      </button>
-      <button class="bottom-nav-item" data-path="/ajustes" id="bottom-btn-settings">
-        <span class="material-symbols-outlined">settings</span>
-        <span class="bottom-nav-label">Ajustes</span>
-      </button>
-    </nav>
+    <!-- Overlay para el Menú Lateral Desplegable (Móvil) -->
+    <div class="drawer-overlay" id="drawer-overlay"></div>
     
   </div>
 
