@@ -61,36 +61,36 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 2. Estrategia de Cache First para el resto de peticiones locales del Frontend
+  // 2. Estrategia Network First (Red Primero) para el resto de peticiones locales del Frontend
   event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      if (cachedResponse) {
-        return cachedResponse;
-      }
-
-      // Si no está en caché, buscarlo en la red
-      return fetch(event.request).then((networkResponse) => {
-        // No cachear respuestas inválidas o externas de terceros (ej: APIs de mapas/geolocalización externas)
-        if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic') {
-          return networkResponse;
+    fetch(event.request)
+      .then((networkResponse) => {
+        // Si la red responde correctamente y es un recurso del propio origen (frontend local), actualizar la caché
+        if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
+          const responseToCache = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(event.request, responseToCache);
+          });
         }
-
-        // Clonar la respuesta para guardarla en caché
-        const responseToCache = networkResponse.clone();
-        caches.open(CACHE_NAME).then((cache) => {
-          cache.put(event.request, responseToCache);
-        });
-
         return networkResponse;
-      }).catch((err) => {
-        // En caso de que falle la red por completo (offline) y no tengamos el recurso cacheado
-        console.warn('[Service Worker] Error de red y recurso no cacheado:', event.request.url, err);
+      })
+      .catch((err) => {
+        console.log('[Service Worker] Error de red. Intentando recuperar de la caché:', event.request.url);
         
-        // Si el usuario intentaba cargar una ruta SPA, servir el index.html cacheado
-        if (event.request.mode === 'navigate') {
-          return caches.match('/index.html');
-        }
-      });
-    })
+        // Si falla la red (offline), buscar el recurso en la caché
+        return caches.match(event.request).then((cachedResponse) => {
+          if (cachedResponse) {
+            return cachedResponse;
+          }
+
+          // Si no está en la caché y es una petición de navegación (recargas de la SPA offline), servir index.html
+          if (event.request.mode === 'navigate') {
+            return caches.match('/index.html');
+          }
+          
+          // Si no hay respuesta en caché, propagar el error de red
+          throw err;
+        });
+      })
   );
 });
