@@ -4,7 +4,6 @@ const CACHE_NAME = 'gooshort-cache-v1';
 // Recursos estáticos locales para precachear
 const STATIC_RESOURCES = [
   '/',
-  '/index.html',
   '/css/estilos.css',
   '/js/app.js',
   '/js/db.js',
@@ -83,9 +82,9 @@ self.addEventListener('fetch', (event) => {
             return cachedResponse;
           }
 
-          // Si no está en la caché y es una petición de navegación (recargas de la SPA offline), servir index.html
+          // Si no está en la caché y es una petición de navegación (recargas de la SPA offline), servir la raíz
           if (event.request.mode === 'navigate') {
-            return caches.match('/index.html');
+            return caches.match('/');
           }
           
           // Si no hay respuesta en caché, propagar el error de red
