@@ -1,5 +1,6 @@
 import { saveLink, getLink, getAllCampaigns } from '../db.js';
 import { setupMarkdownToolbar, escapeHTML } from '../utils/markdown.js';
+import { syncWithCloud } from './settingsView.js';
 
 export function renderGenerationView(container) {
   container.innerHTML = `
@@ -329,6 +330,14 @@ export function renderGenerationView(container) {
         channel.close();
       } catch (e) {
         console.warn('Error al transmitir LINK_CREATED:', e);
+      }
+
+      // Sincronización automática inmediata con la nube en segundo plano
+      const savedPassword = localStorage.getItem('cloud_backup_password');
+      if (savedPassword) {
+        syncWithCloud(savedPassword, true)
+          .then(() => console.log('Enlace sincronizado con la nube exitosamente.'))
+          .catch((err) => console.warn('Sync en segundo plano diferido:', err.message));
       }
 
       // Mostrar resultados

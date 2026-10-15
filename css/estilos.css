@@ -117,6 +117,9 @@ body {
   display: flex;
   flex-direction: column;
   height: 100vh;
+  height: 100dvh;
+  max-width: 100vw;
+  overflow: hidden;
 }
 
 /* Top App Bar (Header) */
@@ -169,6 +172,8 @@ body {
   flex: 1;
   overflow: hidden;
   position: relative;
+  min-width: 0;
+  max-width: 100%;
 }
 
 /* Navigation Rail (Escritorio) */
@@ -324,10 +329,9 @@ body {
 
 .drawer-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   background-color: rgba(0, 0, 0, 0.4);
   z-index: 3000;
   opacity: 0;
@@ -344,6 +348,9 @@ body {
 .main-content {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
+  min-width: 0;
+  max-width: 100%;
   padding: 32px;
   background-color: var(--md-sys-color-surface);
   position: relative;
@@ -445,6 +452,11 @@ body {
 @keyframes spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
+}
+
+.rotate-anim {
+  animation: spin 800ms linear infinite;
+  display: inline-block;
 }
 
 /* Campo de Texto Contorneado (Outlined Text Field) */
@@ -697,6 +709,7 @@ body {
   animation: fadeIn 300ms var(--md-transition-timing);
   max-width: 1000px;
   width: 100%;
+  min-width: 0;
   margin: 0 auto;
 }
 
@@ -751,8 +764,10 @@ body {
 /* Contenedor de Tarjetas */
 .links-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
   gap: 16px;
+  width: 100%;
+  min-width: 0;
 }
 
 .link-card {
@@ -764,6 +779,9 @@ body {
   flex-direction: column;
   gap: 16px;
   transition: all var(--md-transition-duration) var(--md-transition-timing);
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .link-card:hover {
@@ -976,7 +994,7 @@ body {
    RESPONSIVIDAD (Media Queries)
    ========================================================================== */
 
-@media (max-width: 600px) {
+@media (max-width: 768px) {
   .mobile-only {
     display: inline-flex !important;
   }
@@ -1010,6 +1028,7 @@ body {
     top: 0;
     left: 0;
     height: 100vh;
+    height: 100dvh;
     width: 280px;
     z-index: 3100;
     transform: translateX(-280px);
@@ -1138,8 +1157,10 @@ body {
 /* Tarjetas de KPIs (Key Performance Indicators) */
 .analytics-kpis-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
   gap: 16px;
+  width: 100%;
+  min-width: 0;
 }
 
 .kpi-card {
@@ -1150,6 +1171,8 @@ body {
   display: flex;
   align-items: center;
   gap: 16px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .kpi-icon-container {
@@ -1499,6 +1522,8 @@ body {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 20px;
+  width: 100%;
+  min-width: 0;
 }
 
 /* Mapa toma el ancho completo de las 2 columnas */
@@ -1512,6 +1537,8 @@ body {
   flex-direction: column;
   gap: 16px;
   min-height: 400px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 /* Tarjeta estándar de gráficos */
@@ -1524,6 +1551,8 @@ body {
   flex-direction: column;
   gap: 16px;
   min-height: 320px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .chart-card-title {
@@ -1863,21 +1892,35 @@ body {
 }
 
 /* Modo Redirección Aislado (Splash Screen) */
+html.redirect-mode .top-app-bar,
+html.redirect-mode .navigation-rail,
+html.redirect-mode .bottom-navigation,
 body.redirect-mode .top-app-bar,
 body.redirect-mode .navigation-rail,
 body.redirect-mode .bottom-navigation {
   display: none !important;
 }
 
+html.redirect-mode body,
+body.redirect-mode {
+  transition: none !important;
+}
+
+html.redirect-mode .main-content,
 body.redirect-mode .main-content {
   padding: 0 !important;
   min-height: 100vh !important;
+  min-height: 100dvh !important;
   height: 100vh !important;
+  height: 100dvh !important;
 }
 
+html.redirect-mode .redirect-container,
 body.redirect-mode .redirect-container {
   min-height: 100vh !important;
+  min-height: 100dvh !important;
   height: 100vh !important;
+  height: 100dvh !important;
 }
 
 /* Sección de Diagnóstico y Almacenamiento en Ajustes */
@@ -2221,9 +2264,11 @@ body.redirect-mode .redirect-container {
 /* Vista de Campañas */
 .campaigns-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
   gap: 16px;
   margin-top: 20px;
+  width: 100%;
+  min-width: 0;
 }
 
 .campaign-card {
@@ -2236,6 +2281,9 @@ body.redirect-mode .redirect-container {
   gap: 16px;
   transition: all var(--md-transition-duration) var(--md-transition-timing);
   position: relative;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .campaign-card:hover {

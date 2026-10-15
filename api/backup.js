@@ -1,5 +1,83 @@
-// Serverless Function para respaldar/restaurar en un repositorio privado de GitHub
-// api/backup.js
+// Función para fusionar de forma no destructiva la base de datos local y la de la nube
+function mergeDatabases(localData, cloudData) {
+  if (!cloudData || typeof cloudData !== 'object') {
+    return {
+      ...localData,
+      timestamp: Date.now()
+    };
+  }
+
+  const cloudLinks = Array.isArray(cloudData.links) ? cloudData.links : [];
+  const localLinks = Array.isArray(localData.links) ? localData.links : [];
+
+  const mergedLinksMap = new Map();
+
+  // 1. Cargar enlaces de la nube como punto de partida
+  for (const cLink of cloudLinks) {
+    if (!cLink || !cLink.code) continue;
+    mergedLinksMap.set(cLink.code, { ...cLink });
+  }
+
+  // 2. Fusionar con enlaces locales
+  for (const lLink of localLinks) {
+    if (!lLink || !lLink.code) continue;
+
+    if (!mergedLinksMap.has(lLink.code)) {
+      // Enlace nuevo creado en local
+      mergedLinksMap.set(lLink.code, { ...lLink });
+    } else {
+      // El enlace existe en ambos lados: combinar visitas sin duplicados
+      const existing = mergedLinksMap.get(lLink.code);
+      const visitsMap = new Map();
+
+      const existingVisits = Array.isArray(existing.visits) ? existing.visits : [];
+      const localVisits = Array.isArray(lLink.visits) ? lLink.visits : [];
+
+      for (const v of existingVisits) {
+        if (v && v.timestamp) visitsMap.set(v.timestamp, v);
+      }
+      for (const v of localVisits) {
+        if (v && v.timestamp) visitsMap.set(v.timestamp, v);
+      }
+
+      const mergedVisits = Array.from(visitsMap.values()).sort((a, b) => b.timestamp - a.timestamp);
+      const maxClicks = Math.max(mergedVisits.length, existing.clicks || 0, lLink.clicks || 0);
+
+      // Prevalecen los metadatos locales (URL original, configuración de redirección y campañas)
+      mergedLinksMap.set(lLink.code, {
+        ...existing,
+        ...lLink,
+        clicks: maxClicks,
+        visits: mergedVisits
+      });
+    }
+  }
+
+  // 3. Fusionar campañas por ID único
+  const cloudCampaigns = Array.isArray(cloudData.campaigns) ? cloudData.campaigns : [];
+  const localCampaigns = Array.isArray(localData.campaigns) ? localData.campaigns : [];
+  const campaignsMap = new Map();
+
+  for (const c of cloudCampaigns) {
+    if (c && c.id) campaignsMap.set(c.id, c);
+  }
+  for (const c of localCampaigns) {
+    if (c && c.id) campaignsMap.set(c.id, c);
+  }
+
+  // 4. Fusionar ajustes
+  const settings = {
+    ...(cloudData.settings || {}),
+    ...(localData.settings || {})
+  };
+
+  return {
+    links: Array.from(mergedLinksMap.values()),
+    campaigns: Array.from(campaignsMap.values()),
+    settings,
+    timestamp: Date.now()
+  };
+}
 
 export default async function handler(req, res) {
   // Habilitar CORS
@@ -75,7 +153,7 @@ export default async function handler(req, res) {
     }
   }
 
-  // --- MANEJO DE POST (RESPALDAR) ---
+  // --- MANEJO DE POST (FUSIÓN Y RESPALDO INTELIGENTE) ---
   if (req.method === 'POST') {
     try {
       const backupData = req.body;
@@ -83,8 +161,10 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'El cuerpo de la petición debe contener los datos de respaldo en formato JSON.' });
       }
 
-      // A. Consultar si el archivo ya existe para obtener su SHA (evitar colisiones en actualizaciones)
+      // A. Consultar si el archivo ya existe en GitHub para obtener su contenido y SHA
       let currentSha = null;
+      let cloudData = null;
+
       const getResponse = await fetch(githubUrl, {
         method: 'GET',
         headers: headersCommon
@@ -93,18 +173,27 @@ export default async function handler(req, res) {
       if (getResponse.ok) {
         const currentFileData = await getResponse.json();
         currentSha = currentFileData.sha;
+        try {
+          const decodedContent = Buffer.from(currentFileData.content, 'base64').toString('utf-8');
+          cloudData = JSON.parse(decodedContent);
+        } catch (e) {
+          console.warn('El archivo de respaldo existente en GitHub no pudo parsearse como JSON.');
+        }
       } else if (getResponse.status !== 404) {
         const errText = await getResponse.text();
         throw new Error(`Error al verificar existencia del archivo en GitHub: ${getResponse.status} - ${errText}`);
       }
 
-      // B. Codificar el nuevo contenido JSON a Base64
-      const stringifiedData = JSON.stringify(backupData, null, 2);
+      // B. Fusión inteligente bidireccional (Smart Merge)
+      const mergedData = mergeDatabases(backupData, cloudData);
+
+      // C. Codificar el nuevo contenido JSON a Base64
+      const stringifiedData = JSON.stringify(mergedData, null, 2);
       const base64Content = Buffer.from(stringifiedData, 'utf-8').toString('base64');
 
-      // C. Subir/Sobrescribir archivo en GitHub
+      // D. Guardar archivo consolidado en GitHub
       const putBody = {
-        message: `Backup: Sincronización automática desde Goo.short - ${new Date().toLocaleString('es-ES')}`,
+        message: `Sync: Sincronización y fusión inteligente - ${new Date().toLocaleString('es-ES')}`,
         content: base64Content
       };
       if (currentSha) {
@@ -125,10 +214,13 @@ export default async function handler(req, res) {
         throw new Error(`Error de GitHub API (PUT): ${putResponse.status} - ${errText}`);
       }
 
-      return res.status(200).json({ message: 'Respaldo sincronizado en GitHub correctamente.' });
+      return res.status(200).json({
+        message: 'Base de datos sincronizada y fusionada correctamente en GitHub.',
+        data: mergedData
+      });
 
     } catch (error) {
-      console.error('Error al respaldar:', error);
+      console.error('Error al sincronizar y respaldar:', error);
       return res.status(500).json({ error: error.message || 'Error interno al escribir en GitHub.' });
     }
   }

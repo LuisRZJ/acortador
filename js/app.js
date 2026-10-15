@@ -3,7 +3,7 @@ import { renderGenerationView } from './components/generationView.js';
 import { renderManagementView } from './components/managementView.js';
 import { renderAnalyticsView } from './components/analyticsView.js';
 import { renderCampaignsView } from './components/campaignsView.js';
-import { renderSettingsView, checkCloudSync } from './components/settingsView.js';
+import { renderSettingsView, syncWithCloud } from './components/settingsView.js';
 import { parseMarkdown } from './utils/markdown.js';
 
 // Elementos del DOM del layout
@@ -39,31 +39,112 @@ themeToggle.addEventListener('click', () => {
   window.dispatchEvent(new Event('theme-changed'));
 });
 
+// Escuchar cambios dinámicos del tema del sistema operativo para visitantes en modo redirección
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+  const isRedirect = document.body.classList.contains('redirect-mode') || document.documentElement.classList.contains('redirect-mode');
+  if (isRedirect) {
+    document.documentElement.setAttribute('data-theme', e.matches ? 'dark' : 'light');
+  }
+});
 
-let isCheckingSync = false;
+// Guardia de Autenticación de Administrador (Estrategia estricta de bloqueo)
+let isAuthModalOpen = false;
 
-async function checkCloudSyncBackground() {
-  const password = sessionStorage.getItem('cloud_backup_password');
-  const status = sessionStorage.getItem('cloud_status');
-
-  if (!password || status === 'local_only' || isCheckingSync) {
-    return;
+function ensureAdminAuthenticated() {
+  const password = localStorage.getItem('cloud_backup_password');
+  if (password) {
+    return Promise.resolve(password);
   }
 
-  isCheckingSync = true;
-  try {
-    const result = await checkCloudSync(password, true); // triggerModal = true si es outdated
-    if (result.status === 'synced' || result.status === 'no_cloud_backup') {
-      sessionStorage.setItem('cloud_status', 'synced');
-    } else if (result.status === 'unauthorized') {
-      sessionStorage.removeItem('cloud_backup_password');
-      sessionStorage.removeItem('cloud_status');
-    }
-  } catch (err) {
-    console.error('Error al comprobar sincronización en segundo plano:', err);
-  } finally {
-    isCheckingSync = false;
+  if (isAuthModalOpen) {
+    return new Promise(() => {}); // Esperando desbloqueo
   }
+
+  isAuthModalOpen = true;
+
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div');
+    overlay.className = 'md-dialog-overlay';
+    overlay.id = 'admin-auth-dialog-overlay';
+    overlay.style.zIndex = '9999';
+    overlay.style.backdropFilter = 'blur(8px)';
+    overlay.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+
+    overlay.innerHTML = `
+      <div class="md-dialog" style="max-width: 420px; padding: 28px; border-radius: 28px; box-shadow: var(--md-elevation-3); animation: scaleUp 300ms var(--md-transition-timing);">
+        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+          <span class="material-symbols-outlined g-blue" style="font-size: 32px;">admin_panel_settings</span>
+          <h3 class="md-dialog-title" style="margin: 0; font-size: 20px; font-weight: 500; color: var(--md-sys-color-on-surface);">Acceso de Administrador</h3>
+        </div>
+        <p style="font-size: 14px; color: var(--md-sys-color-on-surface-variant); line-height: 1.5; margin-bottom: 20px;">
+          Para proteger la integridad de tus enlaces y sincronización con GitHub, ingresa la contraseña de seguridad para desbloquear la plataforma.
+        </p>
+        
+        <form id="admin-auth-form" style="display: flex; flex-direction: column; gap: 16px;">
+          <div class="outlined-text-field" id="admin-auth-field" style="margin: 0;">
+            <input type="password" id="admin-auth-password" placeholder=" " required autofocus style="width: 100%; height: 56px; padding: 16px; border: 1px solid var(--md-sys-color-outline); border-radius: 8px; background: transparent; color: var(--md-sys-color-on-surface); font-family: var(--font-primary); font-size: 16px; outline: none;">
+            <label for="admin-auth-password">Contraseña de seguridad</label>
+            <div class="field-error-msg" id="admin-auth-error" style="margin-top: 4px;">Contraseña incorrecta. Inténtalo de nuevo.</div>
+          </div>
+
+          <div style="display: flex; justify-content: flex-end; margin-top: 8px;">
+            <button type="submit" class="md-btn md-btn-primary" id="admin-auth-submit-btn" style="height: 48px; padding: 0 24px;">
+              <span class="material-symbols-outlined">lock_open</span>
+              Desbloquear panel
+            </button>
+          </div>
+        </form>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    const form = overlay.querySelector('#admin-auth-form');
+    const input = overlay.querySelector('#admin-auth-password');
+    const field = overlay.querySelector('#admin-auth-field');
+    const submitBtn = overlay.querySelector('#admin-auth-submit-btn');
+
+    input.focus();
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const enteredPass = input.value.trim();
+      if (!enteredPass) return;
+
+      submitBtn.disabled = true;
+      const originalText = submitBtn.innerHTML;
+      submitBtn.innerHTML = `<span class="md-spinner" style="width: 18px; height: 18px; border-width: 2px;"></span> Validando...`;
+      field.classList.remove('error');
+
+      try {
+        const res = await fetch('/api/backup', {
+          method: 'GET',
+          headers: { 'x-backup-password': enteredPass }
+        });
+
+        if (!res.ok) {
+          throw new Error('Contraseña incorrecta');
+        }
+
+        // Guardar permanentemente en el dispositivo
+        localStorage.setItem('cloud_backup_password', enteredPass);
+        
+        // Sincronización inicial silenciosa
+        syncWithCloud(enteredPass, true).catch(err => console.warn('Sync inicial diferido:', err));
+
+        isAuthModalOpen = false;
+        overlay.remove();
+        resolve(enteredPass);
+
+      } catch (err) {
+        field.classList.add('error');
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalText;
+        input.focus();
+        input.select();
+      }
+    });
+  });
 }
 
 // Enrutador de la Aplicación SPA
@@ -261,12 +342,21 @@ async function router() {
     }
   }
 
-  // 2. Enrutamiento normal de la SPA (Creación o Gestión)
+  // 2. Enrutamiento normal de la SPA (Panel de Administrador)
   document.body.classList.remove('redirect-mode');
   initTheme(); // Restaurar el tema del usuario administrador
 
-  // Comprobar sincronización en segundo plano si hay contraseña
-  checkCloudSyncBackground();
+  // Estrategia estricta: No permitir uso de la plataforma si no se detecta la contraseña
+  const adminPassword = await ensureAdminAuthenticated();
+
+  // Si se ingresa a analíticas, sincronizar en segundo plano para traer las visitas más recientes de la nube
+  if (path === '/analiticas' && adminPassword) {
+    syncWithCloud(adminPassword, true)
+      .then(() => {
+        window.dispatchEvent(new CustomEvent('cloud-analytics-synced'));
+      })
+      .catch((e) => console.warn('Sync de analíticas en segundo plano omitido:', e));
+  }
 
   updateNavUI(path);
 

@@ -219,3 +219,67 @@ export function clearAllCampaigns() {
   });
 }
 
+// Aplica el paquete fusionado de la nube directamente a IndexedDB de forma atómica
+export function applyMergedData(mergedData) {
+  if (!mergedData || typeof mergedData !== 'object') {
+    return Promise.resolve(false);
+  }
+
+  return initDB().then((db) => {
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([STORE_NAME, CAMPAIGNS_STORE_NAME], 'readwrite');
+      const linkStore = transaction.objectStore(STORE_NAME);
+      const campaignStore = transaction.objectStore(CAMPAIGNS_STORE_NAME);
+
+      // Limpiar y repoblar con el conjunto consolidado
+      linkStore.clear();
+      if (Array.isArray(mergedData.links)) {
+        for (const link of mergedData.links) {
+          if (link && link.code) {
+            linkStore.put(link);
+          }
+        }
+      }
+
+      campaignStore.clear();
+      if (Array.isArray(mergedData.campaigns)) {
+        for (const camp of mergedData.campaigns) {
+          if (camp && camp.id) {
+            campaignStore.put(camp);
+          }
+        }
+      }
+
+      transaction.oncomplete = () => {
+        if (mergedData.timestamp) {
+          try {
+            localStorage.setItem('local_db_timestamp', mergedData.timestamp.toString());
+          } catch (e) {
+            console.warn('No se pudo guardar la marca de tiempo local:', e);
+          }
+        }
+
+        if (mergedData.settings && typeof mergedData.settings === 'object') {
+          try {
+            if (mergedData.settings.global_redirect_msg !== undefined) {
+              localStorage.setItem('global_redirect_msg', mergedData.settings.global_redirect_msg);
+            }
+            if (mergedData.settings.global_redirect_delay !== undefined) {
+              localStorage.setItem('global_redirect_delay', mergedData.settings.global_redirect_delay.toString());
+            }
+            if (mergedData.settings.global_redirect_type !== undefined) {
+              localStorage.setItem('global_redirect_type', mergedData.settings.global_redirect_type);
+            }
+          } catch (e) {
+            console.warn('No se pudieron aplicar los ajustes globales a localStorage:', e);
+          }
+        }
+
+        resolve(true);
+      };
+
+      transaction.onerror = (e) => reject(e.target.error);
+    });
+  });
+}
+

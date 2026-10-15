@@ -1,8 +1,28 @@
 <!DOCTYPE html>
-<html lang="es" data-theme="light">
+<html lang="es">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <!-- Inicializador Inmediato de Tema y Modo de Redirección (Zero-FOUC / Sin parpadeo) -->
+  <script>
+    (function() {
+      var path = window.location.pathname;
+      var isRedirect = path !== '/' && path !== '/index.html' && path !== '/gestion' && path !== '/analiticas' && path !== '/campanas' && path !== '/ajustes' && !path.includes('.');
+      var systemDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      
+      var theme;
+      if (isRedirect) {
+        theme = systemDark ? 'dark' : 'light';
+        document.documentElement.classList.add('redirect-mode');
+      } else {
+        var saved = localStorage.getItem('theme');
+        theme = saved ? saved : (systemDark ? 'dark' : 'light');
+      }
+      document.documentElement.setAttribute('data-theme', theme);
+    })();
+  </script>
+
   <title>Acortador de Enlaces</title>
   
   <!-- SEO Meta Tags -->

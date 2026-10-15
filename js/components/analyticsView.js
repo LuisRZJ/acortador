@@ -244,9 +244,19 @@ export function renderAnalyticsView(container) {
   // Escuchar redimensionamiento de pantalla y cambio de tema para redibujar
   const handleResize = () => drawCharts();
   const handleThemeChange = () => drawCharts();
+  const handleCloudSync = () => fetchDataAndDraw();
 
   window.addEventListener('resize', handleResize);
   window.addEventListener('theme-changed', handleThemeChange);
+  window.addEventListener('cloud-analytics-synced', handleCloudSync);
+  window.addEventListener('database-synced', handleCloudSync);
+
+  const realtimeChannel = new BroadcastChannel('goo_short_realtime');
+  realtimeChannel.onmessage = (event) => {
+    if (event.data && event.data.type === 'DATABASE_SYNCED') {
+      fetchDataAndDraw();
+    }
+  };
 
   // --- Carga de Datos y Redibujado de Gráficos ---
 

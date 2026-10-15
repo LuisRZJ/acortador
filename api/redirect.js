@@ -162,13 +162,27 @@ export default async function handler(req, res) {
       console.error(`Conflicto al actualizar las analíticas en GitHub: ${putResponse.status} - ${errText}`);
     }
 
-    // 6. Responder solo los datos requeridos para la redirección (protegiendo el resto de analíticas de terceros)
+    // 6. Responder los datos de redirección aplicando jerarquía: Enlace individual > Ajustes globales de la nube
+    const globalSettings = (backupJson.settings && typeof backupJson.settings === 'object') ? backupJson.settings : {};
+    
+    const resolvedMsg = (link.redirect_msg !== undefined && link.redirect_msg !== null && link.redirect_msg !== '')
+      ? link.redirect_msg
+      : (globalSettings.global_redirect_msg || 'Redirigiendo a tu destino...');
+
+    const resolvedDelay = (link.redirect_delay !== undefined && link.redirect_delay !== null && link.redirect_delay !== '')
+      ? parseInt(link.redirect_delay)
+      : (parseInt(globalSettings.global_redirect_delay) || 0);
+
+    const resolvedType = (link.redirect_type !== undefined && link.redirect_type !== null && link.redirect_type !== '')
+      ? link.redirect_type
+      : (globalSettings.global_redirect_type || 'auto');
+
     return res.status(200).json({
       code: link.code,
       original_url: link.original_url,
-      redirect_msg: link.redirect_msg,
-      redirect_delay: link.redirect_delay,
-      redirect_type: link.redirect_type
+      redirect_msg: resolvedMsg,
+      redirect_delay: resolvedDelay,
+      redirect_type: resolvedType
     });
 
   } catch (error) {

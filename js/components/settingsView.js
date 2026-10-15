@@ -1,5 +1,5 @@
 import { setupMarkdownToolbar, escapeHTML } from '../utils/markdown.js';
-import { getAllLinks, saveLink, clearAllLinks, getAllCampaigns, clearAllCampaigns, saveCampaign } from '../db.js';
+import { getAllLinks, saveLink, clearAllLinks, getAllCampaigns, clearAllCampaigns, saveCampaign, applyMergedData } from '../db.js';
 
 export function renderSettingsView(container) {
   // Cargar valores de localStorage o usar predeterminados
@@ -80,7 +80,7 @@ export function renderSettingsView(container) {
           Almacenamiento del sistema
         </h3>
         <p style="font-size: 13px; color: var(--md-sys-color-on-surface-variant); line-height: 1.5; margin-bottom: 16px;">
-          La plataforma almacena tus enlaces acortados y estadísticas de clics de forma 100% local en tu navegador usando **IndexedDB**, garantizando total privacidad.
+          Tus enlaces, campañas, métricas y ajustes globales de redirección se conservan en tu almacenamiento local y se respaldan en la nube privada. La preferencia de tema es el único parámetro exclusivo de este navegador.
         </p>
 
         <!-- Desglose de Almacenamiento (IndexedDB vs LocalStorage) -->
@@ -135,14 +135,14 @@ export function renderSettingsView(container) {
               <div class="storage-sub-card-icon" style="background-color: var(--md-sys-color-secondary-container); color: var(--md-sys-color-secondary);">
                 <span class="material-symbols-outlined" style="font-size: 20px;">settings_applications</span>
               </div>
-              <h4 class="storage-sub-card-title">LocalStorage (Preferencias)</h4>
+              <h4 class="storage-sub-card-title">LocalStorage (Configuración local)</h4>
               <span class="storage-sub-card-total" id="ls-total-size" style="background-color: rgba(102, 90, 111, 0.1); color: var(--md-sys-color-secondary);">0 B</span>
             </div>
             <div class="storage-sub-card-list">
               <div class="storage-sub-card-row">
-                <span class="storage-sub-card-row-label">
-                  <span class="material-symbols-outlined" style="font-size: 16px; color: var(--md-sys-color-secondary);">tune</span>
-                  Ajustes globales
+                <span class="storage-sub-card-row-label" title="Sincronizado con la nube">
+                  <span class="material-symbols-outlined" style="font-size: 16px; color: var(--md-sys-color-primary);">cloud_sync</span>
+                  Ajustes de redirección
                 </span>
                 <span class="storage-sub-card-row-value">
                   <strong id="ls-config-count">0</strong> 
@@ -150,9 +150,9 @@ export function renderSettingsView(container) {
                 </span>
               </div>
               <div class="storage-sub-card-row">
-                <span class="storage-sub-card-row-label">
+                <span class="storage-sub-card-row-label" title="Exclusivo de este dispositivo">
                   <span class="material-symbols-outlined" style="font-size: 16px; color: var(--md-sys-color-secondary);">palette</span>
-                  Preferencia de tema
+                  Preferencia de tema (local)
                 </span>
                 <span class="storage-sub-card-row-value">
                   <strong id="ls-theme-count">0</strong> 
@@ -199,35 +199,32 @@ export function renderSettingsView(container) {
         </div>
       </div>
 
-      <!-- Tarjeta 3: Copia de Seguridad en la Nube (GitHub) -->
+      <!-- Tarjeta 3: Sincronización en la Nube (GitHub) -->
       <div class="md-card" style="margin: 0; max-width: 100%;">
         <h3 style="font-size: 18px; font-weight: 500; color: var(--md-sys-color-on-surface); margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
           <span class="material-symbols-outlined g-blue" style="font-size: 24px;">cloud_sync</span>
-          Copia de seguridad en la nube (GitHub)
+          Sincronización en la nube (GitHub)
         </h3>
         <p style="font-size: 13px; color: var(--md-sys-color-on-surface-variant); line-height: 1.5; margin-bottom: 16px;">
-          Respalda o recupera tus enlaces acortados, visitas y campañas en un repositorio privado de GitHub utilizando la API de Vercel.
+          Mantiene tus enlaces, visitas y campañas sincronizados automáticamente entre todos tus dispositivos y disponibles para visitantes externos mediante un repositorio privado de GitHub.
         </p>
 
         <!-- Formulario de Seguridad de Backup -->
         <div style="display: flex; flex-direction: column; gap: 16px;">
-          <div id="cloud-sync-status-badge" style="font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 8px; padding-left: 4px; transition: all 0.3s;"></div>
+          <!-- Badge de Estado Permanente (No descartable) -->
+          <div id="cloud-sync-status-badge" style="font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-radius: 8px; background-color: var(--md-sys-color-surface-variant); transition: all 0.3s;"></div>
+
           <div class="outlined-text-field" style="margin: 0;" id="backup-password-field">
             <input type="password" id="cloud-backup-password" placeholder=" " required style="width: 100%; height: 56px; padding: 16px; border: 1px solid var(--md-sys-color-outline); border-radius: 8px; background: transparent; color: var(--md-sys-color-on-surface); font-family: var(--font-primary); font-size: 16px; outline: none;">
             <label for="cloud-backup-password">Contraseña de seguridad</label>
             <div class="field-error-msg" id="backup-password-error-msg" style="margin-top: 4px;">Ingresa la contraseña para sincronizar.</div>
           </div>
 
-          <!-- Botones de Acción de GitHub -->
-          <div class="storage-actions-wrapper" style="margin-top: 0;">
-            <button class="md-btn md-btn-outlined" id="btn-cloud-backup" type="button" title="Subir todos tus datos actuales al repositorio privado de GitHub">
-              <span class="material-symbols-outlined" style="font-size: 20px;">cloud_upload</span>
-              Sincronizar en GitHub
-            </button>
-            
-            <button class="md-btn md-btn-outlined" id="btn-cloud-restore" type="button" title="Descargar y restaurar tus datos guardados desde el repositorio privado de GitHub">
-              <span class="material-symbols-outlined" style="font-size: 20px;">cloud_download</span>
-              Restaurar desde GitHub
+          <!-- Botón de Sincronización Unificada -->
+          <div style="display: flex; justify-content: flex-start; margin-top: 0;">
+            <button class="md-btn md-btn-primary" id="btn-sync-now" type="button" style="height: 48px; padding: 0 24px; font-weight: 500; display: inline-flex; align-items: center; gap: 8px;">
+              <span class="material-symbols-outlined" id="sync-btn-icon" style="font-size: 20px;">sync</span>
+              <span id="sync-btn-label">Sincronizar ahora</span>
             </button>
           </div>
         </div>
@@ -305,6 +302,17 @@ export function renderSettingsView(container) {
     localStorage.setItem('global_redirect_msg', msgInput.value.trim());
     localStorage.setItem('global_redirect_delay', delayVal.toString());
     localStorage.setItem('global_redirect_type', typeSelect.value);
+
+    // Sincronizar automáticamente los nuevos ajustes globales con la nube
+    const cloudPass = localStorage.getItem('cloud_backup_password');
+    if (cloudPass) {
+      syncWithCloud(cloudPass, true)
+        .then(() => {
+          updateStorageStats();
+          updateSyncBadge('synced');
+        })
+        .catch(err => console.warn('Sync de ajustes en segundo plano diferido:', err));
+    }
 
     // Feedback visual premium
     saveBtn.disabled = true;
@@ -436,8 +444,7 @@ export function renderSettingsView(container) {
       const settings = {
         global_redirect_msg: localStorage.getItem('global_redirect_msg') || '',
         global_redirect_delay: localStorage.getItem('global_redirect_delay') || '0',
-        global_redirect_type: localStorage.getItem('global_redirect_type') || 'auto',
-        theme: localStorage.getItem('theme') || 'light'
+        global_redirect_type: localStorage.getItem('global_redirect_type') || 'auto'
       };
 
       const backupData = {
@@ -525,22 +532,11 @@ export function renderSettingsView(container) {
           }
         }
 
-        // 3. Importar Preferencias en LocalStorage (si existen en el archivo)
+        // 3. Importar Preferencias globales en LocalStorage (si existen en el archivo)
         if (settingsObj && typeof settingsObj === 'object') {
           if (settingsObj.global_redirect_msg !== undefined) localStorage.setItem('global_redirect_msg', settingsObj.global_redirect_msg);
           if (settingsObj.global_redirect_delay !== undefined) localStorage.setItem('global_redirect_delay', settingsObj.global_redirect_delay);
           if (settingsObj.global_redirect_type !== undefined) localStorage.setItem('global_redirect_type', settingsObj.global_redirect_type);
-          if (settingsObj.theme !== undefined) localStorage.setItem('theme', settingsObj.theme);
-
-          // Forzar la restauración del tema si cambió
-          try {
-            const savedTheme = localStorage.getItem('theme') || 'light';
-            document.documentElement.setAttribute('data-theme', savedTheme);
-            const themeIcon = document.getElementById('theme-icon');
-            if (themeIcon) {
-              themeIcon.textContent = savedTheme === 'dark' ? 'light_mode' : 'dark_mode';
-            }
-          } catch (e) {}
         }
 
         // Transmitir refresco en caliente a las grillas
@@ -635,134 +631,93 @@ export function renderSettingsView(container) {
     });
   });
 
-  // --- LÓGICA DE COPIA DE SEGURIDAD EN LA NUBE (GITHUB) ---
+  // --- LÓGICA DE SINCRONIZACIÓN INTELIGENTE EN LA NUBE (GITHUB) ---
   const backupPassInput = container.querySelector('#cloud-backup-password');
-  const btnCloudBackup = container.querySelector('#btn-cloud-backup');
-  const btnCloudRestore = container.querySelector('#btn-cloud-restore');
+  const btnSyncNow = container.querySelector('#btn-sync-now');
+  const syncBtnIcon = container.querySelector('#sync-btn-icon');
+  const syncBtnLabel = container.querySelector('#sync-btn-label');
   const backupPasswordErrorMsg = container.querySelector('#backup-password-error-msg');
   const backupPasswordField = container.querySelector('#backup-password-field');
   const badge = container.querySelector('#cloud-sync-status-badge');
 
-  async function updateSyncBadge() {
+  function updateSyncBadge(status = null, message = null) {
     if (!badge) return;
-    const password = backupPassInput.value.trim();
-    const status = sessionStorage.getItem('cloud_status');
+    const password = backupPassInput.value.trim() || localStorage.getItem('cloud_backup_password') || '';
+    const lastSync = localStorage.getItem('cloud_sync_last_time');
+
+    if (status === 'syncing') {
+      badge.innerHTML = `
+        <span class="md-spinner" style="width: 16px; height: 16px; border-width: 2px;"></span>
+        <span style="color: var(--md-sys-color-primary); font-size: 13px;">${message || 'Sincronizando con GitHub...'}</span>
+      `;
+      return;
+    }
+
+    if (status === 'error') {
+      badge.innerHTML = `
+        <span class="material-symbols-outlined" style="font-size: 18px; color: var(--md-sys-color-error);">cloud_off</span>
+        <span style="color: var(--md-sys-color-error); font-size: 13px;">${message || 'Error al conectar con la nube'}</span>
+      `;
+      return;
+    }
 
     if (!password) {
       badge.innerHTML = `
-        <span class="material-symbols-outlined" style="font-size: 18px; color: var(--md-sys-color-outline);">cloud_queue</span>
+        <span class="material-symbols-outlined" style="font-size: 18px; color: var(--md-sys-color-outline);">lock</span>
         <span style="color: var(--md-sys-color-on-surface-variant); font-size: 13px;">Ingresa tu contraseña para conectar con GitHub</span>
       `;
       return;
     }
 
-    if (status === 'local_only') {
-      badge.innerHTML = `
-        <span class="material-symbols-outlined" style="font-size: 18px; color: var(--md-sys-color-error);">cloud_off</span>
-        <span style="color: var(--md-sys-color-error); font-size: 13px; font-weight: 500;">Modo Local (Datos de la nube más recientes)</span>
-      `;
-      return;
-    }
-
-    if (status === 'synced') {
-      badge.innerHTML = `
-        <span class="material-symbols-outlined" style="font-size: 18px; color: var(--md-sys-color-success);">cloud_done</span>
-        <span style="color: var(--md-sys-color-success); font-size: 13px; font-weight: 500;">Sincronizado y al día con la nube</span>
-      `;
-      return;
-    }
+    const timeFormatted = lastSync 
+      ? new Date(parseInt(lastSync)).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) 
+      : 'recientemente';
 
     badge.innerHTML = `
-      <span class="material-symbols-outlined" style="font-size: 18px; color: var(--md-sys-color-primary);">cloud_queue</span>
-      <span style="color: var(--md-sys-color-primary); font-size: 13px;">Presiona Enter para verificar estado...</span>
+      <span class="material-symbols-outlined" style="font-size: 18px; color: var(--md-sys-color-success);">cloud_done</span>
+      <span style="color: var(--md-sys-color-success); font-size: 13px;">Sincronizado y al día con la nube (${timeFormatted})</span>
     `;
   }
 
-  async function triggerVerification(password) {
-    if (!password) return;
-    if (badge) {
-      badge.innerHTML = `
-        <span class="md-spinner" style="width: 16px; height: 16px; border-width: 2px;"></span>
-        <span style="color: var(--md-sys-color-primary); font-size: 13px; margin-left: 6px;">Comprobando base de datos en la nube...</span>
-      `;
-    }
-    const result = await checkCloudSync(password, true);
-    if (result.status === 'synced' || result.status === 'no_cloud_backup') {
-      sessionStorage.setItem('cloud_status', 'synced');
-      sessionStorage.setItem('cloud_backup_password', password);
-    } else if (result.status === 'unauthorized') {
-      showStatusToast('Contraseña de seguridad incorrecta.', 'error');
-      sessionStorage.removeItem('cloud_backup_password');
-      sessionStorage.removeItem('cloud_status');
-    } else if (result.status === 'error') {
-      showStatusToast('Error al conectar con la nube: ' + result.error, 'error');
-    }
-    updateSyncBadge();
-  }
-
-  // Escuchar evento de cambio de estado de sincronización (por si se pulsa "Continuar en local")
-  window.addEventListener('cloud-sync-status-changed', (e) => {
-    updateSyncBadge();
-  });
-
-  // Cargar contraseña guardada de la sesión si existe
+  // Pre-cargar contraseña guardada en localStorage
   if (backupPassInput) {
-    backupPassInput.value = sessionStorage.getItem('cloud_backup_password') || '';
-    
-    // Estilos de focus/blur
+    const savedPassword = localStorage.getItem('cloud_backup_password') || '';
+    backupPassInput.value = savedPassword;
+
     backupPassInput.addEventListener('focus', () => {
       backupPassInput.nextElementSibling.style.color = 'var(--md-sys-color-primary)';
       backupPassInput.style.borderColor = 'var(--md-sys-color-primary)';
       backupPassInput.style.borderWidth = '2px';
     });
+
     backupPassInput.addEventListener('blur', () => {
       backupPassInput.nextElementSibling.style.color = 'var(--md-sys-color-on-surface-variant)';
       backupPassInput.style.borderColor = 'var(--md-sys-color-outline)';
       backupPassInput.style.borderWidth = '1px';
-      
-      const password = backupPassInput.value.trim();
-      const savedPassword = sessionStorage.getItem('cloud_backup_password');
-      const status = sessionStorage.getItem('cloud_status');
-      
-      if (password && password !== savedPassword && status !== 'local_only') {
-        triggerVerification(password);
-      }
     });
+
     backupPassInput.addEventListener('input', () => {
       backupPasswordField.classList.remove('error');
       backupPasswordErrorMsg.style.display = 'none';
+      const val = backupPassInput.value.trim();
+      if (val) {
+        localStorage.setItem('cloud_backup_password', val);
+      }
+      updateSyncBadge();
     });
 
     backupPassInput.addEventListener('keypress', (e) => {
       if (e.key === 'Enter') {
         e.preventDefault();
-        triggerVerification(backupPassInput.value.trim());
+        btnSyncNow.click();
       }
     });
   }
 
-  // Comprobación inicial al cargar la vista
-  if (backupPassInput && backupPassInput.value.trim()) {
-    const status = sessionStorage.getItem('cloud_status');
-    if (status !== 'local_only') {
-      triggerVerification(backupPassInput.value.trim());
-    } else {
-      updateSyncBadge();
-    }
-  } else {
-    updateSyncBadge();
-  }
-
-  // A. RESPALDAR DATOS EN GITHUB
-  if (btnCloudBackup) {
-    btnCloudBackup.addEventListener('click', async () => {
-      const status = sessionStorage.getItem('cloud_status');
-      if (status === 'local_only') {
-        showStatusToast('No se puede sincronizar: los datos de la nube son más recientes. Restaura primero.', 'error');
-        return;
-      }
-
-      const password = backupPassInput.value.trim();
+  // Ejecución de la Sincronización Manual
+  if (btnSyncNow) {
+    btnSyncNow.addEventListener('click', async () => {
+      const password = backupPassInput.value.trim() || localStorage.getItem('cloud_backup_password');
       if (!password) {
         backupPasswordField.classList.add('error');
         backupPasswordErrorMsg.textContent = 'Por favor, ingresa tu contraseña de seguridad.';
@@ -770,375 +725,120 @@ export function renderSettingsView(container) {
         return;
       }
 
-      btnCloudBackup.disabled = true;
-      const originalText = btnCloudBackup.innerHTML;
-      btnCloudBackup.innerHTML = `<span class="md-spinner" style="width: 18px; height: 18px; border-width: 2px;"></span> Sincronizando...`;
+      btnSyncNow.disabled = true;
+      syncBtnIcon.textContent = 'sync';
+      syncBtnIcon.classList.add('rotate-anim');
+      syncBtnLabel.textContent = 'Sincronizando...';
+      updateSyncBadge('syncing');
 
       try {
-        const links = await getAllLinks();
-        const campaigns = await getAllCampaigns();
-        const settings = {
-          global_redirect_msg: localStorage.getItem('global_redirect_msg') || '',
-          global_redirect_delay: localStorage.getItem('global_redirect_delay') || '0',
-          global_redirect_type: localStorage.getItem('global_redirect_type') || 'auto',
-          theme: localStorage.getItem('theme') || 'light'
-        };
-
-        const backupPayload = {
-          links,
-          campaigns,
-          settings,
-          timestamp: Date.now()
-        };
-
-        const response = await fetch('/api/backup', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-backup-password': password
-          },
-          body: JSON.stringify(backupPayload)
-        });
-
-        const result = await response.json();
-
-        if (!response.ok) {
-          throw new Error(result.error || 'Ocurrió un error al sincronizar con GitHub.');
-        }
-
-        // Al subir exitosamente, la base de datos local y la nube quedan sincronizadas
-        // Actualizamos local_db_timestamp para reflejar que estamos al día
-        const now = Date.now();
-        localStorage.setItem('local_db_timestamp', now.toString());
-        sessionStorage.setItem('cloud_backup_password', password);
-        sessionStorage.setItem('cloud_status', 'synced');
-        
-        showStatusToast('¡Copia de seguridad en GitHub sincronizada!', 'success');
-        updateSyncBadge();
+        const result = await syncWithCloud(password);
+        showStatusToast('¡Base de datos sincronizada y fusionada!', 'success');
+        updateSyncBadge('synced');
         updateStorageStats();
-
       } catch (err) {
-        console.error(err);
         showStatusToast(err.message, 'error');
+        updateSyncBadge('error', err.message);
       } finally {
-        btnCloudBackup.disabled = false;
-        btnCloudBackup.innerHTML = originalText;
+        btnSyncNow.disabled = false;
+        syncBtnIcon.classList.remove('rotate-anim');
+        syncBtnIcon.textContent = 'sync';
+        syncBtnLabel.textContent = 'Sincronizar ahora';
       }
     });
   }
 
-  // B. RESTAURAR DATOS DESDE GITHUB (MANUAL)
-  if (btnCloudRestore) {
-    btnCloudRestore.addEventListener('click', async () => {
-      const password = backupPassInput.value.trim();
-      if (!password) {
-        backupPasswordField.classList.add('error');
-        backupPasswordErrorMsg.textContent = 'Por favor, ingresa tu contraseña de seguridad.';
-        backupPasswordErrorMsg.style.display = 'block';
-        return;
-      }
-
-      // Diálogo MD3 de confirmación
-      const overlay = document.createElement('div');
-      overlay.className = 'md-dialog-overlay';
-      overlay.style.zIndex = '2000';
-      overlay.innerHTML = `
-        <div class="md-dialog" style="max-width: 440px;">
-          <h3 class="md-dialog-title" style="color: var(--md-sys-color-primary); display: flex; align-items: center; gap: 8px;">
-            <span class="material-symbols-outlined" style="font-size: 28px;">cloud_download</span>
-            ¿Restaurar desde GitHub?
-          </h3>
-          <div class="md-dialog-content" style="color: var(--md-sys-color-on-surface-variant); font-size: 14px; line-height: 1.5; margin-bottom: 24px;">
-            Esta acción descargará la copia de seguridad de GitHub y **sobrescribirá de forma permanente todos tus enlaces, visitas, campañas y ajustes** en este navegador.
-            <br><br>
-            <strong>¡Esta acción es irreversible!</strong> ¿Deseas continuar con la restauración?
-          </div>
-          <div class="md-dialog-actions" style="display: flex; justify-content: flex-end; gap: 8px;">
-            <button class="md-btn md-btn-outlined" id="btn-cancel-cloud-restore">Cancelar</button>
-            <button class="md-btn md-btn-primary" id="btn-confirm-cloud-restore">Restaurar todo</button>
-          </div>
-        </div>
-      `;
-
-      document.body.appendChild(overlay);
-
-      overlay.querySelector('#btn-cancel-cloud-restore').addEventListener('click', () => {
-        document.body.removeChild(overlay);
-      });
-
-      overlay.addEventListener('click', (e) => {
-        if (e.target === overlay) document.body.removeChild(overlay);
-      });
-
-      overlay.querySelector('#btn-confirm-cloud-restore').addEventListener('click', async () => {
-        document.body.removeChild(overlay);
-
-        btnCloudRestore.disabled = true;
-        const originalText = btnCloudRestore.innerHTML;
-        btnCloudRestore.innerHTML = `<span class="md-spinner" style="width: 18px; height: 18px; border-width: 2px;"></span> Descargando...`;
-
-        try {
-          const response = await fetch('/api/backup', {
-            method: 'GET',
-            headers: {
-              'x-backup-password': password
-            }
-          });
-
-          const result = await response.json();
-
-          if (!response.ok) {
-            throw new Error(result.error || 'Ocurrió un error al descargar el respaldo.');
-          }
-
-          // Limpiar IndexedDB de enlaces y campañas
-          await clearAllLinks();
-          await clearAllCampaigns();
-
-          // Restaurar enlaces
-          let linksCount = 0;
-          if (Array.isArray(result.links)) {
-            for (const link of result.links) {
-              await saveLink(link);
-              linksCount++;
-            }
-          }
-
-          // Restaurar campañas
-          let campaignsCount = 0;
-          if (Array.isArray(result.campaigns)) {
-            for (const camp of result.campaigns) {
-              await saveCampaign(camp);
-              campaignsCount++;
-            }
-          }
-
-          // Restaurar LocalStorage
-          if (result.settings && typeof result.settings === 'object') {
-            const s = result.settings;
-            if (s.global_redirect_msg !== undefined) localStorage.setItem('global_redirect_msg', s.global_redirect_msg);
-            if (s.global_redirect_delay !== undefined) localStorage.setItem('global_redirect_delay', s.global_redirect_delay);
-            if (s.global_redirect_type !== undefined) localStorage.setItem('global_redirect_type', s.global_redirect_type);
-            if (s.theme !== undefined) localStorage.setItem('theme', s.theme);
-          }
-
-          // Actualizar el timestamp local con el timestamp de la nube
-          const cloudTimestamp = result.timestamp || 0;
-          localStorage.setItem('local_db_timestamp', cloudTimestamp.toString());
-          sessionStorage.setItem('cloud_backup_password', password);
-          sessionStorage.setItem('cloud_status', 'synced');
-
-          // Emitir refresco en caliente
-          try {
-            const ch = new BroadcastChannel('goo_short_realtime');
-            ch.postMessage({ type: 'LINK_CREATED', link: {} });
-            ch.close();
-          } catch (e) {}
-
-          // Forzar tema
-          try {
-            const savedTheme = localStorage.getItem('theme') || 'light';
-            document.documentElement.setAttribute('data-theme', savedTheme);
-            const themeIcon = document.getElementById('theme-icon');
-            if (themeIcon) {
-              themeIcon.textContent = savedTheme === 'dark' ? 'light_mode' : 'dark_mode';
-            }
-          } catch (e) {}
-
-          showStatusToast(`¡Datos restaurados! (${linksCount} enlaces, ${campaignsCount} campañas)`, 'success');
-          
-          setTimeout(() => {
-            window.location.reload();
-          }, 1500);
-
-        } catch (err) {
-          console.error(err);
-          showStatusToast(err.message, 'error');
-        } finally {
-          btnCloudRestore.disabled = false;
-          btnCloudRestore.innerHTML = originalText;
-        }
-      });
-    });
-  }
+  // Comprobación inicial de estado del badge
+  updateSyncBadge();
 }
 
-// --- FUNCIONES CENTRALIZADAS DE SINCRONIZACIÓN ---
+// --- FUNCIÓN CENTRALIZADA DE SINCRONIZACIÓN Y FUSIÓN (SMART MERGE) ---
+export async function syncWithCloud(password, silent = false) {
+  if (!password) {
+    throw new Error('Falta la contraseña de seguridad.');
+  }
 
-export async function checkCloudSync(password, triggerModal = true) {
-  if (!password) return { status: 'no_password' };
-  
   try {
+    const links = await getAllLinks();
+    const campaigns = await getAllCampaigns();
+    const settings = {
+      global_redirect_msg: localStorage.getItem('global_redirect_msg') || '',
+      global_redirect_delay: localStorage.getItem('global_redirect_delay') || '0',
+      global_redirect_type: localStorage.getItem('global_redirect_type') || 'auto'
+    };
+
+    const backupPayload = {
+      links,
+      campaigns,
+      settings,
+      timestamp: Date.now()
+    };
+
     const response = await fetch('/api/backup', {
-      method: 'GET',
+      method: 'POST',
       headers: {
+        'Content-Type': 'application/json',
         'x-backup-password': password
-      }
+      },
+      body: JSON.stringify(backupPayload)
     });
+
+    const result = await response.json();
 
     if (!response.ok) {
       if (response.status === 401) {
-        return { status: 'unauthorized' };
+        localStorage.removeItem('cloud_backup_password');
+        sessionStorage.removeItem('cloud_backup_password');
+        throw new Error('Contraseña de seguridad incorrecta.');
       }
-      if (response.status === 404) {
-        return { status: 'no_cloud_backup' };
-      }
-      throw new Error('Error al conectar con la nube.');
+      throw new Error(result.error || 'Ocurrió un error al sincronizar con GitHub.');
     }
 
-    const cloudData = await response.json();
-    const cloudTimestamp = cloudData.timestamp || 0;
-    const localTimestamp = parseInt(localStorage.getItem('local_db_timestamp') || '0');
-
-    if (cloudTimestamp > localTimestamp) {
-      if (triggerModal) {
-        showSyncConflictModal(cloudTimestamp, localTimestamp, password, cloudData);
-      }
-      return { status: 'outdated', cloudTimestamp, localTimestamp, cloudData };
+    // Aplicar el resultado consolidado en IndexedDB local
+    if (result.data) {
+      await applyMergedData(result.data);
     }
 
-    return { status: 'synced', cloudTimestamp, localTimestamp };
+    // Persistir credencial y marca de tiempo
+    localStorage.setItem('cloud_backup_password', password);
+    localStorage.setItem('cloud_sync_last_time', Date.now().toString());
+
+    // Notificar al resto de pestañas abiertas para que recarguen sus datos en caliente
+    try {
+      const channel = new BroadcastChannel('goo_short_realtime');
+      channel.postMessage({ type: 'DATABASE_SYNCED', data: result.data });
+      channel.close();
+    } catch (e) {}
+
+    window.dispatchEvent(new CustomEvent('database-synced', { detail: result.data }));
+
+    return { status: 'synced', data: result.data };
+
   } catch (err) {
-    console.error('Error al verificar sincronización:', err);
-    return { status: 'error', error: err.message };
+    if (!silent) {
+      console.error('Error en syncWithCloud:', err);
+    }
+    throw err;
   }
 }
 
-export function showSyncConflictModal(cloudTimestamp, localTimestamp, password, cloudData) {
-  const existingModal = document.getElementById('sync-conflict-dialog-overlay');
-  if (existingModal) {
-    existingModal.remove();
+// Función compatible para comprobación rápida de validez de credenciales
+export async function checkCloudSync(password) {
+  if (!password) return { status: 'no_password' };
+  try {
+    const res = await fetch('/api/backup', {
+      method: 'GET',
+      headers: { 'x-backup-password': password }
+    });
+    if (!res.ok) {
+      if (res.status === 401) return { status: 'unauthorized' };
+      if (res.status === 404) return { status: 'no_cloud_backup' };
+      return { status: 'error' };
+    }
+    return { status: 'synced' };
+  } catch (err) {
+    return { status: 'error', error: err.message };
   }
-
-  const overlay = document.createElement('div');
-  overlay.className = 'md-dialog-overlay';
-  overlay.id = 'sync-conflict-dialog-overlay';
-  overlay.style.zIndex = '4000';
-  
-  const cloudDate = new Date(cloudTimestamp).toLocaleString('es-ES');
-  const localDate = localTimestamp > 0 
-    ? new Date(localTimestamp).toLocaleString('es-ES') 
-    : 'Sin datos locales / Versión anterior';
-
-  overlay.innerHTML = `
-    <div class="md-dialog" style="max-width: 480px; animation: scaleUp 300ms var(--md-transition-timing);">
-      <h3 class="md-dialog-title" style="color: var(--md-sys-color-primary); display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
-        <span class="material-symbols-outlined" style="font-size: 28px;">cloud_sync</span>
-        Conflicto de sincronización
-      </h3>
-      <div class="md-dialog-content" style="color: var(--md-sys-color-on-surface-variant); font-size: 14px; line-height: 1.6; margin-bottom: 24px;">
-        Se ha detectado que la base de datos respaldada en la nube (GitHub) es más reciente que tus datos locales en este navegador.
-        <div style="margin-top: 16px; padding: 12px; border-radius: 8px; background-color: var(--md-sys-color-surface-variant); display: flex; flex-direction: column; gap: 6px;">
-          <div><strong>Nube (más reciente):</strong> ${cloudDate}</div>
-          <div><strong>Local:</strong> ${localDate}</div>
-        </div>
-        <br>
-        <strong>¿Qué deseas hacer?</strong>
-        <p style="margin: 8px 0; font-size: 13px;">
-          <strong>Restaurar desde la nube:</strong> Sobrescribe los datos de tu navegador con el respaldo más nuevo.
-          <br>
-          <strong>Continuar en local:</strong> Opera localmente y deshabilita la subida a la nube durante esta sesión para proteger el respaldo.
-        </p>
-      </div>
-      <div class="md-dialog-actions" style="display: flex; justify-content: flex-end; gap: 12px;">
-        <button class="md-btn md-btn-outlined" id="btn-sync-continue-local" style="border-color: var(--md-sys-color-outline);">
-          Continuar en local
-        </button>
-        <button class="md-btn md-btn-primary" id="btn-sync-restore-cloud">
-          Restaurar desde la nube
-        </button>
-      </div>
-    </div>
-  `;
-
-  document.body.appendChild(overlay);
-
-  overlay.querySelector('#btn-sync-continue-local').addEventListener('click', () => {
-    document.body.removeChild(overlay);
-    sessionStorage.setItem('cloud_status', 'local_only');
-    sessionStorage.removeItem('cloud_backup_password');
-    
-    const passwordInput = document.getElementById('cloud-backup-password');
-    if (passwordInput) {
-      passwordInput.value = '';
-    }
-    
-    showStatusToast('Operando en modo local. Sincronización en la nube desactivada.', 'error');
-    window.dispatchEvent(new CustomEvent('cloud-sync-status-changed', { detail: 'local_only' }));
-  });
-
-  overlay.querySelector('#btn-sync-restore-cloud').addEventListener('click', async () => {
-    const btnRestore = overlay.querySelector('#btn-sync-restore-cloud');
-    const btnLocal = overlay.querySelector('#btn-sync-continue-local');
-    btnRestore.disabled = true;
-    btnLocal.disabled = true;
-    const originalText = btnRestore.innerHTML;
-    btnRestore.innerHTML = `<span class="md-spinner" style="width: 18px; height: 18px; border-width: 2px; border-color: white;"></span> Restaurando...`;
-
-    try {
-      const { clearAllLinks, clearAllCampaigns, saveLink, saveCampaign } = await import('../db.js');
-
-      await clearAllLinks();
-      await clearAllCampaigns();
-
-      let linksCount = 0;
-      if (Array.isArray(cloudData.links)) {
-        for (const link of cloudData.links) {
-          await saveLink(link);
-          linksCount++;
-        }
-      }
-
-      let campaignsCount = 0;
-      if (Array.isArray(cloudData.campaigns)) {
-        for (const camp of cloudData.campaigns) {
-          await saveCampaign(camp);
-          campaignsCount++;
-        }
-      }
-
-      if (cloudData.settings && typeof cloudData.settings === 'object') {
-        const s = cloudData.settings;
-        if (s.global_redirect_msg !== undefined) localStorage.setItem('global_redirect_msg', s.global_redirect_msg);
-        if (s.global_redirect_delay !== undefined) localStorage.setItem('global_redirect_delay', s.global_redirect_delay);
-        if (s.global_redirect_type !== undefined) localStorage.setItem('global_redirect_type', s.global_redirect_type);
-        if (s.theme !== undefined) localStorage.setItem('theme', s.theme);
-      }
-
-      localStorage.setItem('local_db_timestamp', cloudTimestamp.toString());
-      sessionStorage.setItem('cloud_backup_password', password);
-      sessionStorage.setItem('cloud_status', 'synced');
-
-      try {
-        const ch = new BroadcastChannel('goo_short_realtime');
-        ch.postMessage({ type: 'LINK_CREATED', link: {} });
-        ch.close();
-      } catch (e) {}
-
-      try {
-        const savedTheme = localStorage.getItem('theme') || 'light';
-        document.documentElement.setAttribute('data-theme', savedTheme);
-        const themeIcon = document.getElementById('theme-icon');
-        if (themeIcon) {
-          themeIcon.textContent = savedTheme === 'dark' ? 'light_mode' : 'dark_mode';
-        }
-      } catch (e) {}
-
-      document.body.removeChild(overlay);
-      showStatusToast(`¡Datos restaurados! (${linksCount} enlaces, ${campaignsCount} campañas)`, 'success');
-      
-      setTimeout(() => {
-        window.location.reload();
-      }, 1500);
-
-    } catch (err) {
-      console.error(err);
-      btnRestore.disabled = false;
-      btnLocal.disabled = false;
-      btnRestore.innerHTML = originalText;
-      showStatusToast('Error al restaurar los datos: ' + err.message, 'error');
-    }
-  });
 }
 
 // Función global para notificaciones flotantes premium (Toasts)

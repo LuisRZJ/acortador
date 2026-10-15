@@ -1,5 +1,6 @@
 import { getAllLinks, deleteLink, saveLink, getAllCampaigns } from '../db.js';
 import { setupMarkdownToolbar, escapeHTML } from '../utils/markdown.js';
+import { syncWithCloud } from './settingsView.js';
 
 export function renderManagementView(container, navigateTo) {
   container.innerHTML = `
@@ -599,6 +600,12 @@ export function renderManagementView(container, navigateTo) {
         }
 
         await saveLink(updatedLink);
+
+        // Sincronizar en segundo plano con la nube
+        const cloudPass = localStorage.getItem('cloud_backup_password');
+        if (cloudPass) {
+          syncWithCloud(cloudPass, true).catch(err => console.warn('Sync en segundo plano diferido:', err));
+        }
 
         // Transmitir edición en tiempo real
         try {
