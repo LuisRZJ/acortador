@@ -1,10 +1,15 @@
-import { initDB, getLink, incrementClicks } from './db.js';
+import { initDB, getLink, incrementClicks, saveLink } from './db.js';
 import { renderGenerationView } from './components/generationView.js';
 import { renderManagementView } from './components/managementView.js';
 import { renderAnalyticsView } from './components/analyticsView.js';
 import { renderCampaignsView } from './components/campaignsView.js';
 import { renderSettingsView, syncWithCloud } from './components/settingsView.js';
 import { parseMarkdown } from './utils/markdown.js';
+
+// Enlaces críticos blindados con destino garantizado
+const CRITICAL_BLINDED_LINKS = {
+  'W0DaR': 'https://docs.google.com/forms/d/e/1FAIpQLSf7mQPM3DIWd4qXDI030yxu886gErpvJ8RHAzuz0XGDAj0NvA/viewform'
+};
 
 // Elementos del DOM del layout
 const appView = document.getElementById('app-router-view');
@@ -162,21 +167,114 @@ async function router() {
     document.documentElement.setAttribute('data-theme', systemPrefersDark ? 'dark' : 'light');
 
     const code = path.substring(1); // Remover la primera barra "/"
+    const diagnosticLogs = [];
+    const addLog = (stage, status, details = {}) => {
+      diagnosticLogs.push({
+        timestamp: new Date().toISOString(),
+        stage,
+        status,
+        ...details
+      });
+    };
+
+    addLog('INIT', 'INFO', {
+      path,
+      code,
+      online: navigator.onLine,
+      url: window.location.href
+    });
+
     try {
-      // Buscar el código en la base de datos local
-      let link = await getLink(code);
+      // 1. Buscar el código en la base de datos local (IndexedDB)
+      let link = null;
       let fromCloud = false;
 
+      addLog('LOCAL_DB', 'INFO', { message: 'Consultando almacén IndexedDB local...' });
+      try {
+        link = await getLink(code);
+        if (link) {
+          addLog('LOCAL_DB', 'SUCCESS', { message: 'Enlace localizado en IndexedDB local', target: link.original_url });
+        } else {
+          addLog('LOCAL_DB', 'WARNING', { message: 'Enlace no encontrado en IndexedDB local (esperado en modo incógnito o nuevos dispositivos)' });
+        }
+      } catch (dbErr) {
+        addLog('LOCAL_DB', 'ERROR', { message: 'Excepción al consultar IndexedDB local', error: dbErr?.message || String(dbErr) });
+      }
+
+      // 2. Fallback a la nube (Serverless Function /api/redirect)
       if (!link) {
-        // Fallback en la nube: buscar en el servidor
+        addLog('CLOUD_API', 'INFO', {
+          message: 'Iniciando consulta de contingencia a la API en la nube...',
+          endpoint: `/api/redirect?code=${encodeURIComponent(code)}`
+        });
         try {
-          const cloudRes = await fetch(`/api/redirect?code=${code}`);
-          if (cloudRes.ok) {
-            link = await cloudRes.json();
-            fromCloud = true;
+          const startTime = performance.now();
+          const cloudRes = await fetch(`/api/redirect?code=${encodeURIComponent(code)}`);
+          const durationMs = Math.round(performance.now() - startTime);
+
+          let cloudData = null;
+          let rawSnippet = '';
+          try {
+            const rawText = await cloudRes.text();
+            rawSnippet = rawText.substring(0, 200);
+            cloudData = JSON.parse(rawText);
+          } catch (jsonErr) {
+            addLog('CLOUD_API', 'ERROR', {
+              message: 'Error al interpretar respuesta JSON del servidor',
+              rawSnippet
+            });
           }
-        } catch (e) {
-          console.warn('Error al realizar el fallback en la nube:', e);
+
+          if (cloudRes.ok && cloudData && cloudData.original_url) {
+            link = cloudData;
+            fromCloud = true;
+            addLog('CLOUD_API', 'SUCCESS', {
+              message: 'Enlace resuelto exitosamente desde la base de datos en la nube',
+              httpStatus: cloudRes.status,
+              durationMs,
+              target: link.original_url,
+              redirectType: link.redirect_type || 'auto',
+              redirectDelay: link.redirect_delay || 0
+            });
+          } else {
+            addLog('CLOUD_API', 'ERROR', {
+              message: 'La base de datos en la nube no contiene este enlace o devolvió un error',
+              httpStatus: cloudRes.status,
+              statusText: cloudRes.statusText,
+              durationMs,
+              serverError: cloudData?.error || rawSnippet || 'Sin mensaje de error explícito'
+            });
+          }
+        } catch (fetchErr) {
+          addLog('CLOUD_API', 'ERROR', {
+            message: 'Fallo de red o excepción al conectar con la API en la nube',
+            error: fetchErr?.message || String(fetchErr)
+          });
+        }
+      }
+
+      // 3. Blindaje de enlaces críticos del sistema (contra modo incógnito o contingencias de red)
+      if (!link && CRITICAL_BLINDED_LINKS[code]) {
+        addLog('BLINDAJE', 'SUCCESS', {
+          message: 'Enlace crítico detectado en blindaje de seguridad local. Forzando destino oficial garantizado.',
+          officialUrl: CRITICAL_BLINDED_LINKS[code]
+        });
+        link = {
+          code: code,
+          original_url: CRITICAL_BLINDED_LINKS[code],
+          clicks: 0,
+          created_at: Date.now()
+        };
+        fromCloud = false;
+        saveLink(link).catch(() => {});
+      } else if (link && CRITICAL_BLINDED_LINKS[code]) {
+        if (link.original_url !== CRITICAL_BLINDED_LINKS[code]) {
+          addLog('BLINDAJE', 'INFO', {
+            message: 'Alineando URL de destino del enlace crítico con la directiva oficial.',
+            from: link.original_url,
+            to: CRITICAL_BLINDED_LINKS[code]
+          });
+          link.original_url = CRITICAL_BLINDED_LINKS[code];
         }
       }
 
@@ -332,12 +430,21 @@ async function router() {
         return;
       } else {
         // Enlace no encontrado (Error 404)
-        render404View(code);
+        addLog('RESOLUTION', 'ERROR', {
+          message: 'Resolución fallida. El código no existe en la base de datos de la nube ni en el almacenamiento local.',
+          code
+        });
+        render404View(code, diagnosticLogs);
         return;
       }
     } catch (err) {
+      addLog('UNEXPECTED_ERROR', 'ERROR', {
+        message: 'Error imprevisto al procesar la redirección en el navegador',
+        error: err?.message || String(err),
+        stack: err?.stack || ''
+      });
       console.error('Error al procesar la redirección:', err);
-      render404View(code);
+      render404View(code, diagnosticLogs);
       return;
     }
   }
@@ -421,29 +528,101 @@ function setupNavigationListeners() {
   });
 }
 
-// Vista de Error 404 integrada
-function render404View(code = '') {
+// Vista de Error 404 integrada con soporte de depuración técnica
+function render404View(code = '', diagnosticLogs = []) {
   updateNavUI('/404'); // Desactivar cualquier botón de nav seleccionado
   
+  const hasLogs = Array.isArray(diagnosticLogs) && diagnosticLogs.length > 0;
+  const formattedLogs = hasLogs ? formatDiagnosticReport(diagnosticLogs) : '';
+
   appView.innerHTML = `
     <div class="error-view-container">
       <div class="error-code g-blue">404</div>
       <h2 class="error-title">Enlace no encontrado</h2>
       <p class="error-description">
         ${code 
-          ? `El enlace corto con el código <strong>/${escapeHTML(code)}</strong> no está registrado en el almacenamiento IndexedDB de este navegador.` 
+          ? `El enlace corto con el código <strong>/${escapeHTML(code)}</strong> no fue encontrado en la base de datos de la nube ni en el almacenamiento local.` 
           : 'La página que estás buscando no existe o se ha movido.'}
       </p>
-      <button class="md-btn md-btn-primary" id="btn-back-home">
-        <span class="material-symbols-outlined">home</span>
-        Ir al creador de enlaces
-      </button>
+      
+      <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap; justify-content: center;">
+        <button class="md-btn md-btn-primary" id="btn-back-home">
+          <span class="material-symbols-outlined">home</span>
+          Ir al creador de enlaces
+        </button>
+        ${hasLogs ? `
+          <button class="debug-toggle-btn" id="toggle-debug-logs">
+            <span class="material-symbols-outlined" style="font-size: 18px;">bug_report</span>
+            Detalles técnicos
+          </button>
+        ` : ''}
+      </div>
+
+      ${hasLogs ? `
+        <div class="debug-logs-card" id="debug-logs-card">
+          <div class="debug-logs-header">
+            <div class="debug-logs-title">
+              <span class="material-symbols-outlined" style="font-size: 18px; color: var(--md-sys-color-primary);">terminal</span>
+              Diagnóstico del proceso de resolución
+            </div>
+            <div class="debug-logs-actions">
+              <button class="debug-copy-btn" id="copy-debug-logs-btn">
+                <span class="material-symbols-outlined" style="font-size: 16px;">content_copy</span>
+                Copiar reporte
+              </button>
+            </div>
+          </div>
+          <pre class="debug-logs-pre" id="debug-logs-pre">${escapeHTML(formattedLogs)}</pre>
+        </div>
+      ` : ''}
     </div>
   `;
 
   appView.querySelector('#btn-back-home').addEventListener('click', () => {
     navigateTo('/');
   });
+
+  if (hasLogs) {
+    const toggleBtn = appView.querySelector('#toggle-debug-logs');
+    const logsCard = appView.querySelector('#debug-logs-card');
+    const copyBtn = appView.querySelector('#copy-debug-logs-btn');
+
+    toggleBtn.addEventListener('click', () => {
+      const isShowing = logsCard.classList.toggle('show');
+      toggleBtn.classList.toggle('active', isShowing);
+      toggleBtn.innerHTML = isShowing
+        ? '<span class="material-symbols-outlined" style="font-size: 18px;">expand_less</span> Ocultar detalles técnicos'
+        : '<span class="material-symbols-outlined" style="font-size: 18px;">bug_report</span> Detalles técnicos';
+    });
+
+    copyBtn.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(formattedLogs);
+        copyBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size: 16px;">check</span> ¡Copiado!';
+        copyBtn.style.color = 'var(--md-sys-color-success, #137333)';
+        setTimeout(() => {
+          copyBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size: 16px;">content_copy</span> Copiar reporte';
+          copyBtn.style.color = '';
+        }, 2000);
+      } catch (e) {
+        console.warn('No se pudo copiar el log al portapapeles:', e);
+      }
+    });
+  }
+}
+
+// Formatea el reporte de diagnóstico para inspección técnica
+function formatDiagnosticReport(logs) {
+  if (!logs || !logs.length) return 'Sin registros de diagnóstico disponibles.';
+  return logs.map((log) => {
+    const timeStr = log.timestamp ? log.timestamp.split('T')[1].replace('Z', '') : '';
+    const header = `[${timeStr}] [${log.stage}] ${log.status}`;
+    const details = Object.entries(log)
+      .filter(([k]) => k !== 'timestamp' && k !== 'stage' && k !== 'status')
+      .map(([k, v]) => `  • ${k}: ${typeof v === 'object' ? JSON.stringify(v) : v}`)
+      .join('\n');
+    return details ? `${header}\n${details}` : header;
+  }).join('\n\n');
 }
 
 // Escapar caracteres HTML para evitar XSS en la vista 404

@@ -9,6 +9,11 @@ const countries = {
   'PR': 'Puerto Rico', 'UY': 'Uruguay', 'VE': 'Venezuela', 'US': 'Estados Unidos'
 };
 
+// Enlaces críticos blindados con destino garantizado
+const CRITICAL_BLINDED_LINKS = {
+  'W0DaR': 'https://docs.google.com/forms/d/e/1FAIpQLSf7mQPM3DIWd4qXDI030yxu886gErpvJ8RHAzuz0XGDAj0NvA/viewform'
+};
+
 function parseUA(ua) {
   if (!ua) return { browser: 'Desconocido', os: 'Desconocido' };
   
@@ -65,6 +70,15 @@ export default async function handler(req, res) {
   const filePath = process.env.BACKUP_FILE_PATH || 'backup.json';
 
   if (!token || !repo) {
+    if (CRITICAL_BLINDED_LINKS[code]) {
+      return res.status(200).json({
+        code: code,
+        original_url: CRITICAL_BLINDED_LINKS[code],
+        redirect_msg: 'Redirigiendo a tu destino...',
+        redirect_delay: 0,
+        redirect_type: 'auto'
+      });
+    }
     console.error('Faltan GITHUB_TOKEN o GITHUB_REPO en las variables de entorno de Vercel.');
     return res.status(500).json({
       error: 'Configuración de base de datos incompleta en el servidor.'
@@ -85,11 +99,19 @@ export default async function handler(req, res) {
       headers: headersCommon
     });
 
-    if (getResponse.status === 404) {
-      return res.status(404).json({ error: 'No se encontró el archivo de respaldo en GitHub.' });
-    }
-
-    if (!getResponse.ok) {
+    if (getResponse.status === 404 || !getResponse.ok) {
+      if (CRITICAL_BLINDED_LINKS[code]) {
+        return res.status(200).json({
+          code: code,
+          original_url: CRITICAL_BLINDED_LINKS[code],
+          redirect_msg: 'Redirigiendo a tu destino...',
+          redirect_delay: 0,
+          redirect_type: 'auto'
+        });
+      }
+      if (getResponse.status === 404) {
+        return res.status(404).json({ error: 'No se encontró el archivo de respaldo en GitHub.' });
+      }
       const errText = await getResponse.text();
       throw new Error(`GitHub API (GET) falló: ${getResponse.status} - ${errText}`);
     }
@@ -102,16 +124,39 @@ export default async function handler(req, res) {
     const backupJson = JSON.parse(decodedContent);
 
     if (!backupJson || typeof backupJson !== 'object' || !Array.isArray(backupJson.links)) {
+      if (CRITICAL_BLINDED_LINKS[code]) {
+        return res.status(200).json({
+          code: code,
+          original_url: CRITICAL_BLINDED_LINKS[code],
+          redirect_msg: 'Redirigiendo a tu destino...',
+          redirect_delay: 0,
+          redirect_type: 'auto'
+        });
+      }
       return res.status(500).json({ error: 'La copia de seguridad no posee una estructura de base de datos válida.' });
     }
 
     // 3. Buscar el enlace
     const linkIndex = backupJson.links.findIndex(l => l.code === code);
-    if (linkIndex === -1) {
-      return res.status(404).json({ error: `El enlace corto /${code} no existe en la base de datos.` });
-    }
+    let link = null;
 
-    const link = backupJson.links[linkIndex];
+    if (linkIndex === -1) {
+      if (CRITICAL_BLINDED_LINKS[code]) {
+        link = {
+          code: code,
+          original_url: CRITICAL_BLINDED_LINKS[code],
+          clicks: 0
+        };
+      } else {
+        return res.status(404).json({ error: `El enlace corto /${code} no existe en la base de datos.` });
+      }
+    } else {
+      link = backupJson.links[linkIndex];
+      // Blindaje de enlace crítico: asegurar que el destino sea el oficial
+      if (CRITICAL_BLINDED_LINKS[code]) {
+        link.original_url = CRITICAL_BLINDED_LINKS[code];
+      }
+    }
 
     // 4. Registrar la visita en caliente
     const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '';
@@ -186,6 +231,15 @@ export default async function handler(req, res) {
     });
 
   } catch (error) {
+    if (CRITICAL_BLINDED_LINKS[code]) {
+      return res.status(200).json({
+        code: code,
+        original_url: CRITICAL_BLINDED_LINKS[code],
+        redirect_msg: 'Redirigiendo a tu destino...',
+        redirect_delay: 0,
+        redirect_type: 'auto'
+      });
+    }
     console.error('Error al resolver la redirección en la nube:', error);
     return res.status(500).json({ error: error.message || 'Error interno al procesar la redirección.' });
   }

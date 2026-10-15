@@ -959,6 +959,114 @@ body {
   line-height: 1.6;
 }
 
+/* Diagnóstico Técnico en Pantalla de Error 404 */
+.debug-toggle-btn {
+  background: transparent;
+  border: 1px solid var(--md-sys-color-outline-variant);
+  color: var(--md-sys-color-on-surface-variant);
+  padding: 8px 16px;
+  border-radius: 100px;
+  font-size: 13px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: all var(--md-transition-duration);
+}
+
+.debug-toggle-btn:hover,
+.debug-toggle-btn.active {
+  background-color: var(--md-sys-color-surface-container-high);
+  color: var(--md-sys-color-primary);
+  border-color: var(--md-sys-color-primary);
+}
+
+.debug-logs-card {
+  display: none;
+  width: 100%;
+  max-width: 680px;
+  margin-top: 24px;
+  background-color: var(--md-sys-color-surface-container);
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: 16px;
+  padding: 16px;
+  text-align: left;
+  box-shadow: var(--md-elevation-1);
+  animation: fadeIn 200ms var(--md-transition-timing);
+}
+
+.debug-logs-card.show {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.debug-logs-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--md-sys-color-outline-variant);
+  padding-bottom: 10px;
+}
+
+.debug-logs-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--md-sys-color-on-surface);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.debug-logs-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.debug-copy-btn {
+  background-color: transparent;
+  border: 1px solid var(--md-sys-color-outline);
+  color: var(--md-sys-color-primary);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all var(--md-transition-duration);
+}
+
+.debug-copy-btn:hover {
+  background-color: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-on-primary-container);
+}
+
+.debug-logs-pre {
+  background-color: #1e1e1e;
+  color: #e2e8f0;
+  padding: 14px;
+  border-radius: 10px;
+  font-family: 'Roboto Mono', Consolas, Monaco, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 280px;
+  overflow-y: auto;
+  margin: 0;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="dark"] .debug-logs-pre {
+  background-color: #0d1117;
+  color: #c9d1d9;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
 /* ==========================================================================
    ANIMACIONES
    ========================================================================== */

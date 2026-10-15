@@ -3,8 +3,10 @@
   "version": "1.0.0",
   "description": "Acortador de enlaces SPA personal al estilo Google",
   "main": "index.html",
+  "type": "module",
   "scripts": {
-    "dev": "serve -s ."
+    "dev": "node server.js",
+    "start": "node server.js"
   },
   "devDependencies": {
     "serve": "^14.2.3"
